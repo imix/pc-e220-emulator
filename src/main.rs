@@ -6,6 +6,7 @@ use std::sync::mpsc;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::TryRecvError;
 use std::thread;
+use std::time;
 
 use ez80::{Cpu, Machine};
 use pixels::{Pixels, SurfaceTexture};
@@ -98,10 +99,14 @@ fn main() {
                 }
 
                 let frame = pixels.frame_mut();
-                for (i, &pix) in machine.framebuffer.iter().enumerate() {
-                    let rgba = [pix, pix, pix, 255];
-                    let idx = i * 4;
-                    frame[idx..idx + 4].copy_from_slice(&rgba);
+                for y in 0..HEIGHT {
+                    for x in 0..WIDTH {
+                        let i = y * WIDTH + x;
+                        let pix = machine.framebuffer[i];
+                        let rgba = [pix, pix, pix, 255];
+                        let idx = i * 4;
+                        frame[idx..idx + 4].copy_from_slice(&rgba);
+                    }
                 }
 
                 pixels.render().unwrap();
@@ -142,9 +147,9 @@ struct PCE220Machine {
     pub in_port: Option<u8>,
     pub out_port: Option<u8>,
     pub out_value: u8,
-    lcd_x: usize,
-    lcd_y: usize,
-    lcd_busy: bool,
+    row: usize,
+    col: usize,
+    last_col: usize,
 }
 
 impl PCE220Machine {
@@ -156,9 +161,9 @@ impl PCE220Machine {
             out_port: None,
             out_value: 0,
             in_port: None,
-            lcd_x: 0,
-            lcd_y: 0,
-            lcd_busy: false,
+            row: 0,
+            col: 0,
+            last_col: 0,
         }
     }
 }
@@ -189,34 +194,34 @@ impl Machine for PCE220Machine {
         self.out_port = Some(address as u8);
         self.out_value = value;
 
+        let timeout = time::Duration::from_millis(100);
+        thread::sleep(timeout);
+
         match trunc_address {
-            // LCD-control out
-            0x5A => {
-                // value: column*4+row | 40 , 0 <= column < 24, 0 <= row < 4 
-                for i in 0..8 {
-                    let pixel_y = self.lcd_y + i;
-                    if self.lcd_x < WIDTH && pixel_y < HEIGHT {
-                        let bit = (value >> i) & 1;
-                        self.framebuffer[pixel_y * WIDTH + self.lcd_x] = bit * 255;
-                    }
-                }
-                if self.lcd_x + 1 < WIDTH {
-                    self.lcd_x += 1;
-                } else {
-                    self.lcd_x = 0;
-                    self.lcd_y = (self.lcd_y + 8) % HEIGHT;
-                }
-                self.lcd_busy = true;
-            }
             // LCD-data out
-            0x58 => {
+            0x5A => {
                 // each byte represents 8 successive pixels in a column
-                let val = value & 0x3F;
-                let col = (val >> 2) as usize;
-                let row = (val & 0x03) as usize;
-                self.lcd_x = col * 6;
-                self.lcd_y = row * 8;
-                self.lcd_busy = true;
+                println!("LCD-data → row: {}, col: {}", self.row, self.col);
+                for row_idx in 0..7 {
+                    let pos_x = self.col * 5 + self.last_col;
+                    let pos_y = self.row * 8 + row_idx;
+                    let pixel = (value >> row_idx) & 0x01;
+                    println!(
+                        "LCD-data → pos_x: {}, pos_y: {}, pixel: {}",
+                        pos_x, pos_y, pixel
+                    );
+                    self.framebuffer[pos_y * WIDTH + pos_x] = pixel * 255;
+                }
+                self.last_col += 1;
+            }
+            // LCD-control out
+            0x58 => {
+                // value: column*4+row | 40 , 0 <= column < 24, 0 <= row < 4
+                let val = value | 0x40;
+                self.row = (val & 0x03) as usize;
+                self.col = ((val & 0xFC) >> 2) as usize;
+                self.last_col = 0;
+                println!("LCD-control → row: {}, col: {}", self.row, self.col);
             }
             _ => {}
         }
@@ -224,27 +229,3 @@ impl Machine for PCE220Machine {
 
     fn use_cycles(&self, _cycles: u32) {}
 }
-
-// ========== assets/bank0.bin ==========
-// ROM bank at 0x0000 - 0x3FFF
-
-// ========== assets/bank1.bin ==========
-// ROM bank at 0x4000 - 0x7FFF
-
-// ========== assets/bank2.bin ==========
-// ROM bank at 0x8000 - 0xBFFF
-
-// ========== assets/bank3.bin ==========
-// ROM bank at 0xC000 - 0xFFFF
-
-// ========== assets/bank4.bin ==========
-// ROM bank at 0x10000 - 0x13FFF
-
-// ========== assets/bank5.bin ==========
-// ROM bank at 0x14000 - 0x17FFF
-
-// ========== assets/bank6.bin ==========
-// ROM bank at 0x18000 - 0x1BFFF
-
-// ========== assets/bank7.bin ==========
-// ROM bank at 0x1C000 - 0x1FFFF
