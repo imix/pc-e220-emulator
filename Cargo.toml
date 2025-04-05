@@ -1,0 +1,9 @@
+[package]
+name = "pc-e220-emulator"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+pixels = "0.13.0"
+winit = "0.28.6"
+ez80 = { git = "https://github.com/tomm/ez80" }
