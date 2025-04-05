@@ -1,6 +1,5 @@
 // PC-E220 Emulator adapted to use pixels + winit rendering
 
-use std::fs;
 use std::io::*;
 use std::sync::mpsc;
 use std::sync::mpsc::Receiver;
@@ -18,25 +17,25 @@ use winit::window::WindowBuilder;
 const WIDTH: usize = 144;
 const HEIGHT: usize = 32;
 
+static BANK0_SYSTEM: &[u8] = include_bytes!("../assets/bank0.bin");
+static BANK1_BASIC: &[u8] = include_bytes!("../assets/bank1.bin");
+static BANK2_PERIPHERY: &[u8] = include_bytes!("../assets/bank2.bin");
+static BANK3_MONITOR: &[u8] = include_bytes!("../assets/bank3.bin");
+static BANK4_FONTS: &[u8] = include_bytes!("../assets/bank4.bin");
+static BANK5_ASM: &[u8] = include_bytes!("../assets/bank5.bin");
+static BANK6_ENG1: &[u8] = include_bytes!("../assets/bank6.bin");
+static BANK7_ENG2: &[u8] = include_bytes!("../assets/bank7.bin");
+
 fn main() {
-    // Load ROMs with configurable base addresses
-    let rom_paths = vec![("assets/bank0.bin", 0x8000), ("assets/bank1.bin", 0xC000)];
-
-    let roms: Vec<_> = rom_paths
-        .into_iter()
-        .map(|(path, base)| {
-            let data = fs::read(path).unwrap_or_else(|_| panic!("Missing {}", path));
-            (base as u32, data)
-        })
-        .collect();
-
-    // Build emulator
+    // Load initial roms
     let mut machine = PCE220Machine::new();
-    for (addr, data) in &roms {
-        for (i, byte) in data.iter().enumerate() {
-            machine.poke(*addr + i as u32, *byte);
-        }
+    for (i, byte) in BANK0_SYSTEM.iter().enumerate() {
+        machine.poke(0x8000 + i as u32, *byte);
     }
+    for (i, byte) in BANK1_BASIC.iter().enumerate() {
+        machine.poke(0xC000 + i as u32, *byte);
+    }
+
     let mut cpu = Cpu::new();
     cpu.set_trace(true);
     // BFF4 RUN Mode
@@ -198,6 +197,25 @@ impl Machine for PCE220Machine {
         thread::sleep(timeout);
 
         match trunc_address {
+            // switch memory from bank
+            0x19 => {
+                let bank = value & 0x03;
+                println!("Bank-mapping → bank: {}", bank);
+                let data = match bank {
+                    0x00 => BANK0_SYSTEM,
+                    0x01 => BANK1_BASIC,
+                    0x02 => BANK2_PERIPHERY,
+                    0x03 => BANK3_MONITOR,
+                    0x04 => BANK4_FONTS,
+                    0x05 => BANK5_ASM,
+                    0x06 => BANK6_ENG1,
+                    0x07 => BANK7_ENG2,
+                    _ => BANK1_BASIC,
+                };
+                for (i, byte) in data.iter().enumerate() {
+                    self.poke(0xC000 + i as u32, *byte);
+                }
+            }
             // LCD-data out
             0x5A => {
                 // each byte represents 8 successive pixels in a column
