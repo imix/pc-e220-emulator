@@ -23,12 +23,6 @@ fn main() {
     let rom_paths = vec![
         ("assets/bank0.bin", 0x8000),
         ("assets/bank1.bin", 0xC000),
-        ("assets/bank2.bin", 0x0000),
-        ("assets/bank3.bin", 0x4000),
-        ("assets/bank4.bin", 0x10000),
-        ("assets/bank5.bin", 0x14000),
-        ("assets/bank6.bin", 0x18000),
-        ("assets/bank7.bin", 0x1C000),
     ];
 
     let roms: Vec<_> = rom_paths
@@ -40,14 +34,16 @@ fn main() {
         .collect();
 
     // Build emulator
-    let mut machine = VilleMachine::new();
+    let mut machine = PCE220Machine::new();
     for (addr, data) in &roms {
         for (i, byte) in data.iter().enumerate() {
             machine.poke(*addr + i as u32, *byte);
         }
     }
     let mut cpu = Cpu::new();
-    cpu.state.set_pc(0x0000);
+    cpu.set_trace(true);
+    // BFF4 RUN Mode
+    cpu.state.set_pc(0xbff4);
 
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new()
@@ -138,7 +134,7 @@ fn spawn_stdin_channel() -> Receiver<u8> {
     rx
 }
 
-struct VilleMachine {
+struct PCE220Machine {
     mem: [u8; 65536],
     pub framebuffer: [u8; WIDTH * HEIGHT],
     pub in_values: [u8; 256],
@@ -150,9 +146,9 @@ struct VilleMachine {
     lcd_busy: bool,
 }
 
-impl VilleMachine {
+impl PCE220Machine {
     pub fn new() -> Self {
-        VilleMachine {
+        PCE220Machine {
             mem: [0; 65536],
             framebuffer: [0; WIDTH * HEIGHT],
             in_values: [0; 256],
@@ -166,7 +162,7 @@ impl VilleMachine {
     }
 }
 
-impl Machine for VilleMachine {
+impl Machine for PCE220Machine {
     fn peek(&self, address: u32) -> u8 {
         self.mem[address as usize % 65536]
     }
@@ -182,10 +178,14 @@ impl Machine for VilleMachine {
     }
 
     fn port_out(&mut self, address: u16, value: u8) {
+        let trunc_address = address & 0xff;
+
+        println!("PORT OUT → addr: 0x{:02X}, value: 0x{:02X} ({})", trunc_address, value, value as char);
+
         self.out_port = Some(address as u8);
         self.out_value = value;
 
-        if address == 0x5A {
+        if trunc_address == 0x5A {
             for i in 0..8 {
                 let pixel_y = self.lcd_y + i;
                 if self.lcd_x < WIDTH && pixel_y < HEIGHT {
@@ -202,7 +202,7 @@ impl Machine for VilleMachine {
             self.lcd_busy = true;
         }
 
-        if address == 0x58 {
+        if trunc_address == 0x58 {
             let val = value & 0x3F;
             let col = (val >> 2) as usize;
             let row = (val & 0x03) as usize;
