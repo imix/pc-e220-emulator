@@ -7,7 +7,6 @@ use std::sync::mpsc::Receiver;
 use std::sync::mpsc::TryRecvError;
 use std::thread;
 
-
 use ez80::{Cpu, Machine};
 use pixels::{Pixels, SurfaceTexture};
 use winit::dpi::LogicalSize;
@@ -20,10 +19,7 @@ const HEIGHT: usize = 32;
 
 fn main() {
     // Load ROMs with configurable base addresses
-    let rom_paths = vec![
-        ("assets/bank0.bin", 0x8000),
-        ("assets/bank1.bin", 0xC000),
-    ];
+    let rom_paths = vec![("assets/bank0.bin", 0x8000), ("assets/bank1.bin", 0xC000)];
 
     let roms: Vec<_> = rom_paths
         .into_iter()
@@ -70,8 +66,8 @@ fn main() {
 
                     if let Some(port) = machine.out_port {
                         match port {
-                            2 => {},
-                            3 => {},
+                            2 => {}
+                            3 => {}
                             _ => {}
                         }
                         machine.out_port = None;
@@ -80,7 +76,7 @@ fn main() {
                     if let Some(port) = machine.in_port {
                         match port {
                             2 => in_char_waiting = false,
-                            3 => {},
+                            3 => {}
                             _ => {}
                         }
                         machine.in_port = None;
@@ -92,11 +88,11 @@ fn main() {
                                 machine.in_values[2] = key;
                                 in_char_waiting = true;
                                 machine.in_values[3] = 3;
-                            },
+                            }
                             Err(TryRecvError::Empty) => {
                                 machine.in_values[3] = 1;
-                            },
-                            Err(TryRecvError::Disconnected) => {},
+                            }
+                            Err(TryRecvError::Disconnected) => {}
                         }
                     }
                 }
@@ -110,7 +106,10 @@ fn main() {
 
                 pixels.render().unwrap();
             }
-            Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => {
+            Event::WindowEvent {
+                event: WindowEvent::CloseRequested,
+                ..
+            } => {
                 *control_flow = ControlFlow::Exit;
             }
             Event::MainEventsCleared => {
@@ -127,7 +126,9 @@ fn spawn_stdin_channel() -> Receiver<u8> {
         let mut buffer = String::new();
         stdin().read_line(&mut buffer).unwrap();
         for mut c in buffer.bytes() {
-            if c == 10 { c = 13; }
+            if c == 10 {
+                c = 13;
+            }
             tx.send(c).unwrap();
         }
     });
@@ -180,35 +181,44 @@ impl Machine for PCE220Machine {
     fn port_out(&mut self, address: u16, value: u8) {
         let trunc_address = address & 0xff;
 
-        println!("PORT OUT → addr: 0x{:02X}, value: 0x{:02X} ({})", trunc_address, value, value as char);
+        println!(
+            "PORT OUT → addr: 0x{:02X}, value: 0x{:02X} ({})",
+            trunc_address, value, value as char
+        );
 
         self.out_port = Some(address as u8);
         self.out_value = value;
 
-        if trunc_address == 0x5A {
-            for i in 0..8 {
-                let pixel_y = self.lcd_y + i;
-                if self.lcd_x < WIDTH && pixel_y < HEIGHT {
-                    let bit = (value >> i) & 1;
-                    self.framebuffer[pixel_y * WIDTH + self.lcd_x] = bit * 255;
+        match trunc_address {
+            // LCD-control out
+            0x5A => {
+                // value: column*4+row | 40 , 0 <= column < 24, 0 <= row < 4 
+                for i in 0..8 {
+                    let pixel_y = self.lcd_y + i;
+                    if self.lcd_x < WIDTH && pixel_y < HEIGHT {
+                        let bit = (value >> i) & 1;
+                        self.framebuffer[pixel_y * WIDTH + self.lcd_x] = bit * 255;
+                    }
                 }
+                if self.lcd_x + 1 < WIDTH {
+                    self.lcd_x += 1;
+                } else {
+                    self.lcd_x = 0;
+                    self.lcd_y = (self.lcd_y + 8) % HEIGHT;
+                }
+                self.lcd_busy = true;
             }
-            if self.lcd_x + 1 < WIDTH {
-                self.lcd_x += 1;
-            } else {
-                self.lcd_x = 0;
-                self.lcd_y = (self.lcd_y + 8) % HEIGHT;
+            // LCD-data out
+            0x58 => {
+                // each byte represents 8 successive pixels in a column
+                let val = value & 0x3F;
+                let col = (val >> 2) as usize;
+                let row = (val & 0x03) as usize;
+                self.lcd_x = col * 6;
+                self.lcd_y = row * 8;
+                self.lcd_busy = true;
             }
-            self.lcd_busy = true;
-        }
-
-        if trunc_address == 0x58 {
-            let val = value & 0x3F;
-            let col = (val >> 2) as usize;
-            let row = (val & 0x03) as usize;
-            self.lcd_x = col * 6;
-            self.lcd_y = row * 8;
-            self.lcd_busy = true;
+            _ => {}
         }
     }
 
@@ -238,4 +248,3 @@ impl Machine for PCE220Machine {
 
 // ========== assets/bank7.bin ==========
 // ROM bank at 0x1C000 - 0x1FFFF
-
