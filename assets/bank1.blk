@@ -1,0 +1,4 @@
+memclear: start 0xc261 end 0xc279 type bytedata
+machinelang: start 0xc32f end 0xc33f type bytedata
+keywords: start 0xd1e5 end 0xd46d type bytedata
+lprt: start 0xf508 end 0xf515 type bytedata

@@ -1,0 +1,2 @@
+stringout: equ 0xbff1
+runmode: equ 0xbff4

@@ -1,0 +1,7 @@
+keyboard: start 0x8b98 end 0x8baf type bytedata
+allreset: start 0x92ec end 0x92f4 type bytedata
+runprogr: start 0xa0ab end 0xa0ba type bytedata
+errorin: start 0xa651 end 0xa65a type bytedata
+breakin: start 0xa6f3 end 0xa6fc type bytedata
+msgwords: start 0xb94e end 0xb984 type bytedata
+textedit: start 0xb9f5 end 0xb9ff type bytedata
