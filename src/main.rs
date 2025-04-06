@@ -17,6 +17,7 @@ use winit::window::WindowBuilder;
 const WIDTH: usize = 144;
 const HEIGHT: usize = 32;
 
+static PROGRAM: &[u8] = include_bytes!("../assets/a.bin");
 static BANK0_SYSTEM: &[u8] = include_bytes!("../assets/bank0.bin");
 static BANK1_BASIC: &[u8] = include_bytes!("../assets/bank1.bin");
 static BANK2_PERIPHERY: &[u8] = include_bytes!("../assets/bank2.bin");
@@ -29,6 +30,9 @@ static BANK7_ENG2: &[u8] = include_bytes!("../assets/bank7.bin");
 fn main() {
     // Load initial roms
     let mut machine = PCE220Machine::new();
+    for (i, byte) in PROGRAM.iter().enumerate() {
+        machine.poke(0x0000 + i as u32, *byte);
+    }
     for (i, byte) in BANK0_SYSTEM.iter().enumerate() {
         machine.poke(0x8000 + i as u32, *byte);
     }
@@ -39,7 +43,8 @@ fn main() {
     let mut cpu = Cpu::new();
     cpu.set_trace(true);
     // BFF4 RUN Mode
-    cpu.state.set_pc(0xbff4);
+    //cpu.state.set_pc(0xbff4);
+    cpu.state.set_pc(0x0000);
 
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new()
@@ -149,6 +154,7 @@ struct PCE220Machine {
     row: usize,
     col: usize,
     last_col: usize,
+    higher_cols: bool,
 }
 
 impl PCE220Machine {
@@ -163,6 +169,7 @@ impl PCE220Machine {
             row: 0,
             col: 0,
             last_col: 0,
+            higher_cols: false,
         }
     }
 }
@@ -177,8 +184,15 @@ impl Machine for PCE220Machine {
     }
 
     fn port_in(&mut self, address: u16) -> u8 {
+        let trunc_address = address & 0xff;
         let value = self.in_values[address as usize % 256];
-        self.in_port = Some(address as u8);
+
+        println!(
+            "PORT IN → addr: 0x{:02X}, value: 0x{:02X} ({})",
+            trunc_address, value, value as char
+        );
+
+        self.in_port = Some(trunc_address as u8);
         value
     }
 
@@ -193,14 +207,15 @@ impl Machine for PCE220Machine {
         self.out_port = Some(address as u8);
         self.out_value = value;
 
-        let timeout = time::Duration::from_millis(100);
-        thread::sleep(timeout);
+        // let timeout = time::Duration::from_millis(100);
+        // thread::sleep(timeout);
 
         match trunc_address {
             // switch memory from bank
             0x19 => {
-                let bank = value & 0x03;
-                println!("Bank-mapping → bank: {}", bank);
+                // 0xC000 mapping
+                let bank = value & 0x07;
+                println!("Bank-mapping 0xC000 → bank: {}", bank);
                 let data = match bank {
                     0x00 => BANK0_SYSTEM,
                     0x01 => BANK1_BASIC,
@@ -214,6 +229,10 @@ impl Machine for PCE220Machine {
                 };
                 for (i, byte) in data.iter().enumerate() {
                     self.poke(0xC000 + i as u32, *byte);
+                }
+                let exp = (value >> 6) & 0x1;
+                if exp == 0x01 {
+                    print!("Expansion selected!");
                 }
             }
             // LCD-data out
@@ -230,16 +249,44 @@ impl Machine for PCE220Machine {
                     );
                     self.framebuffer[pos_y * WIDTH + pos_x] = pixel * 255;
                 }
-                self.last_col += 1;
+                if self.higher_cols {
+                    self.last_col -= 1;
+                } else {
+                    self.last_col += 1;
+                }
             }
             // LCD-control out
+            // from: https://wwwhomes.uni-bielefeld.de/achim/pc-e220/char_out.txt
+            // ; the 24x4 character LCD has on each position 6x8 pixels
+            // ; the left 12 columns (0-11) are addressed from left to right
+            // ; but the right 12 column are logical the rows 4-7 and these
+            // ; columns are addressed by 0-11 from right to left!
             0x58 => {
-                // value: column*4+row | 40 , 0 <= column < 24, 0 <= row < 4
-                let val = value | 0x40;
-                self.row = (val & 0x03) as usize;
-                self.col = ((val & 0xFC) >> 2) as usize;
-                self.last_col = 0;
-                println!("LCD-control → row: {}, col: {}", self.row, self.col);
+                // first part of row, identified by 0x8b
+                if value & 0x8b == 0x8b {
+                    self.row = (value & 0x03) as usize;
+                    self.higher_cols = false;
+                    println!("LCD-control → row: {}", self.row);
+                }
+                if value & 0x8c == 0x8c {
+                    self.row = (value & 0x03) as usize;
+                    self.higher_cols = true;
+                    println!("LCD-control → row high: {}", self.row);
+                } else {
+                    // column
+                    println!("LCD-control → value: {}", value);
+                    println!("LCD-control → (val & 0x3f): {}", (value & 0x3f));
+                    println!("LCD-control → (val & 0x3f) / 5: {}", (value & 0x3f) / 5);
+                    let val = ((value & 0x3f) / 5) as usize;
+                    if self.higher_cols {
+                        self.col = 23 - val;
+                        self.last_col = 5;
+                    } else {
+                        self.col = val;
+                        self.last_col = 0;
+                    }
+                    println!("LCD-control → col: {}", self.col);
+                }
             }
             _ => {}
         }
