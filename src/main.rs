@@ -10,6 +10,7 @@ use std::time;
 use ez80::{Cpu, Machine};
 use pixels::{Pixels, SurfaceTexture};
 use winit::dpi::LogicalSize;
+use winit::event::{ElementState, KeyboardInput, VirtualKeyCode};
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::WindowBuilder;
@@ -57,8 +58,6 @@ fn main() {
     let surface_texture = SurfaceTexture::new(WIDTH as u32, HEIGHT as u32, &window);
     let mut pixels = Pixels::new(WIDTH as u32, HEIGHT as u32, surface_texture).unwrap();
 
-    let stdin_channel = spawn_stdin_channel();
-    let mut in_char_waiting = false;
     machine.in_values[3] = 1; // TX Ready
     machine.in_values[0x19] = 1; // bank 1 preloaded
 
@@ -81,25 +80,10 @@ fn main() {
 
                     if let Some(port) = machine.in_port {
                         match port {
-                            2 => in_char_waiting = false,
                             3 => {}
                             _ => {}
                         }
                         machine.in_port = None;
-                    }
-
-                    if !in_char_waiting {
-                        match stdin_channel.try_recv() {
-                            Ok(key) => {
-                                machine.in_values[2] = key;
-                                in_char_waiting = true;
-                                machine.in_values[3] = 3;
-                            }
-                            Err(TryRecvError::Empty) => {
-                                machine.in_values[3] = 1;
-                            }
-                            Err(TryRecvError::Disconnected) => {}
-                        }
                     }
                 }
 
@@ -115,6 +99,31 @@ fn main() {
                 }
 
                 pixels.render().unwrap();
+            }
+            Event::WindowEvent {
+                event: WindowEvent::KeyboardInput { input, .. },
+                ..
+            } => {
+                if let Some(keycode) = input.virtual_keycode {
+                    if input.state == ElementState::Pressed {
+                        println!("Key pressed → keycode: {:?}", keycode);
+                        // Convert keycode to byte if needed
+                        let byte = match keycode {
+                            VirtualKeyCode::A => b'a',
+                            VirtualKeyCode::Y => b'y',
+                            VirtualKeyCode::Return => 13,
+                            VirtualKeyCode::Space => b' ',
+                            _ => 0, // or skip
+                        };
+                        println!("Key pressed → byte: {:?}", byte);
+                        cpu.interrupt(&mut machine);
+
+                        if byte != 0 {
+                            // Emulate serial input
+                            machine.in_values[10] = byte;
+                        }
+                    }
+                }
             }
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
