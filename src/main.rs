@@ -60,6 +60,7 @@ fn main() {
     let stdin_channel = spawn_stdin_channel();
     let mut in_char_waiting = false;
     machine.in_values[3] = 1; // TX Ready
+    machine.in_values[0x19] = 1; // bank 1 preloaded
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
@@ -230,6 +231,8 @@ impl Machine for PCE220Machine {
                 for (i, byte) in data.iter().enumerate() {
                     self.poke(0xC000 + i as u32, *byte);
                 }
+                self.in_values[0x19] = bank;
+
                 let exp = (value >> 6) & 0x1;
                 if exp == 0x01 {
                     print!("Expansion selected!");
