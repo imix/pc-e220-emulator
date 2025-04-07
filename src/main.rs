@@ -43,8 +43,8 @@ fn main() {
     let mut cpu = Cpu::new();
     cpu.set_trace(true);
     // BFF4 RUN Mode
-    //cpu.state.set_pc(0xbff4);
-    cpu.state.set_pc(0x0000);
+    cpu.state.set_pc(0xbff4);
+    //cpu.state.set_pc(0x0000);
 
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new()
@@ -207,8 +207,8 @@ impl Machine for PCE220Machine {
         self.out_port = Some(address as u8);
         self.out_value = value;
 
-        // let timeout = time::Duration::from_millis(100);
-        // thread::sleep(timeout);
+        //let timeout = time::Duration::from_millis(20);
+        //thread::sleep(timeout);
 
         match trunc_address {
             // switch memory from bank
@@ -262,16 +262,18 @@ impl Machine for PCE220Machine {
             // ; but the right 12 column are logical the rows 4-7 and these
             // ; columns are addressed by 0-11 from right to left!
             0x58 => {
-                // first part of row, identified by 0x8b
-                if value & 0x8b == 0x8b {
-                    self.row = (value & 0x03) as usize;
-                    self.higher_cols = false;
-                    println!("LCD-control → row: {}", self.row);
-                }
-                if value & 0x8c == 0x8c {
-                    self.row = (value & 0x03) as usize;
-                    self.higher_cols = true;
-                    println!("LCD-control → row high: {}", self.row);
+                // first part of row, rows start with 0x8b, cols with 0x40
+                if value & 0x40 != 0x40 {
+                    let row = value & 0x07;
+                    if row < 4 {
+                        self.row = row as usize;
+                        self.higher_cols = false;
+                        println!("LCD-control → row: {}", self.row);
+                    } else {
+                        self.row = (row - 4) as usize;
+                        self.higher_cols = true;
+                        println!("LCD-control → row high: {}", self.row);
+                    }
                 } else {
                     // column
                     println!("LCD-control → value: {}", value);
