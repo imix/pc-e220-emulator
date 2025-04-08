@@ -18,7 +18,8 @@ use winit::window::WindowBuilder;
 const WIDTH: usize = 144;
 const HEIGHT: usize = 32;
 
-static PROGRAM: &[u8] = include_bytes!("../assets/a.bin");
+static RAMLOW: &[u8] = include_bytes!("../assets/sharp-ram0.bin");
+static RAM7800: &[u8] = include_bytes!("../assets/ram_7800.bin");
 static BANK0_SYSTEM: &[u8] = include_bytes!("../assets/bank0.bin");
 static BANK1_BASIC: &[u8] = include_bytes!("../assets/bank1.bin");
 static BANK2_PERIPHERY: &[u8] = include_bytes!("../assets/bank2.bin");
@@ -31,15 +32,10 @@ static BANK7_ENG2: &[u8] = include_bytes!("../assets/bank7.bin");
 fn main() {
     // Load initial roms
     let mut machine = PCE220Machine::new();
-    for (i, byte) in PROGRAM.iter().enumerate() {
-        machine.poke(0x0000 + i as u16, *byte);
-    }
-    for (i, byte) in BANK0_SYSTEM.iter().enumerate() {
-        machine.poke(0x8000 + i as u16, *byte);
-    }
-    for (i, byte) in BANK1_BASIC.iter().enumerate() {
-        machine.poke(0xC000 + i as u16, *byte);
-    }
+    load_memory(&mut machine, 0x0000, RAMLOW);
+    load_memory(&mut machine, 0x7800, RAM7800);
+    load_memory(&mut machine, 0x8000, BANK0_SYSTEM);
+    load_memory(&mut machine, 0xC000, BANK1_BASIC);
 
     let mut cpu = Cpu::new();
     cpu.set_trace(true);
@@ -139,19 +135,10 @@ fn main() {
     });
 }
 
-fn spawn_stdin_channel() -> Receiver<u8> {
-    let (tx, rx) = mpsc::channel::<u8>();
-    thread::spawn(move || loop {
-        let mut buffer = String::new();
-        stdin().read_line(&mut buffer).unwrap();
-        for mut c in buffer.bytes() {
-            if c == 10 {
-                c = 13;
-            }
-            tx.send(c).unwrap();
-        }
-    });
-    rx
+fn load_memory(machine: &mut PCE220Machine, address: u16, memory: &[u8]) {
+    for (i, byte) in memory.iter().enumerate() {
+        machine.poke(address + i as u16, *byte);
+    }
 }
 
 struct PCE220Machine {
@@ -237,9 +224,7 @@ impl Machine for PCE220Machine {
                     0x07 => BANK7_ENG2,
                     _ => BANK1_BASIC,
                 };
-                for (i, byte) in data.iter().enumerate() {
-                    self.poke(0xC000 + i as u16, *byte);
-                }
+                load_memory(self, 0xC000, data);
                 self.in_values[0x19] = bank;
 
                 let exp = (value >> 6) & 0x1;

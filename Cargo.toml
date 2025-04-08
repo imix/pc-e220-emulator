@@ -5,5 +5,5 @@ edition = "2021"
 
 [dependencies]
 pixels = "0.13.0"
-winit = "0.28.6"
-ez80 = { git = "https://github.com/tomm/ez80" }
+winit = { version = "0.28", features = ["wayland"] }
+iz80 = { git = "https://github.com/ivanizag/iz80" }

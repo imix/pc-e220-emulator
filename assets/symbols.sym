@@ -1,2 +1,3 @@
 stringout: equ 0xbff1
+charout: equ 0x8468
 runmode: equ 0xbff4
