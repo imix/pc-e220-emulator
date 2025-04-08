@@ -7,7 +7,7 @@ use std::sync::mpsc::TryRecvError;
 use std::thread;
 use std::time;
 
-use ez80::{Cpu, Machine};
+use iz80::{Cpu, Machine};
 use pixels::{Pixels, SurfaceTexture};
 use winit::dpi::LogicalSize;
 use winit::event::{ElementState, KeyboardInput, VirtualKeyCode};
@@ -32,19 +32,19 @@ fn main() {
     // Load initial roms
     let mut machine = PCE220Machine::new();
     for (i, byte) in PROGRAM.iter().enumerate() {
-        machine.poke(0x0000 + i as u32, *byte);
+        machine.poke(0x0000 + i as u16, *byte);
     }
     for (i, byte) in BANK0_SYSTEM.iter().enumerate() {
-        machine.poke(0x8000 + i as u32, *byte);
+        machine.poke(0x8000 + i as u16, *byte);
     }
     for (i, byte) in BANK1_BASIC.iter().enumerate() {
-        machine.poke(0xC000 + i as u32, *byte);
+        machine.poke(0xC000 + i as u16, *byte);
     }
 
     let mut cpu = Cpu::new();
     cpu.set_trace(true);
     // BFF4 RUN Mode
-    cpu.state.set_pc(0xbff4);
+    //cpu.state.set_pc(0xbff4);
     //cpu.state.set_pc(0x0000);
 
     let event_loop = EventLoop::new();
@@ -116,7 +116,7 @@ fn main() {
                             _ => 0, // or skip
                         };
                         println!("Key pressed → byte: {:?}", byte);
-                        cpu.interrupt(&mut machine);
+                        cpu.signal_interrupt(true);
 
                         if byte != 0 {
                             // Emulate serial input
@@ -185,11 +185,11 @@ impl PCE220Machine {
 }
 
 impl Machine for PCE220Machine {
-    fn peek(&self, address: u32) -> u8 {
+    fn peek(&self, address: u16) -> u8 {
         self.mem[address as usize % 65536]
     }
 
-    fn poke(&mut self, address: u32, value: u8) {
+    fn poke(&mut self, address: u16, value: u8) {
         self.mem[address as usize % 65536] = value;
     }
 
@@ -238,7 +238,7 @@ impl Machine for PCE220Machine {
                     _ => BANK1_BASIC,
                 };
                 for (i, byte) in data.iter().enumerate() {
-                    self.poke(0xC000 + i as u32, *byte);
+                    self.poke(0xC000 + i as u16, *byte);
                 }
                 self.in_values[0x19] = bank;
 
@@ -305,6 +305,4 @@ impl Machine for PCE220Machine {
             _ => {}
         }
     }
-
-    fn use_cycles(&self, _cycles: u32) {}
 }
