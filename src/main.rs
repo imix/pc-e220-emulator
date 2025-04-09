@@ -65,22 +65,8 @@ fn main() {
                 for _ in 0..1000 {
                     cpu.execute_instruction(&mut machine);
 
-                    if let Some(port) = machine.out_port {
-                        match port {
-                            2 => {}
-                            3 => {}
-                            _ => {}
-                        }
-                        machine.out_port = None;
-                    }
-
-                    if let Some(port) = machine.in_port {
-                        match port {
-                            3 => {}
-                            _ => {}
-                        }
-                        machine.in_port = None;
-                    }
+                    // reset any pending interrupts after execution
+                    cpu.signal_interrupt(false);
                 }
 
                 let frame = pixels.frame_mut();
@@ -103,21 +89,13 @@ fn main() {
                 if let Some(keycode) = input.virtual_keycode {
                     if input.state == ElementState::Pressed {
                         println!("Key pressed → keycode: {:?}", keycode);
-                        // Convert keycode to byte if needed
-                        let byte = match keycode {
-                            VirtualKeyCode::A => b'a',
-                            VirtualKeyCode::Y => b'y',
-                            VirtualKeyCode::Return => 13,
-                            VirtualKeyCode::Space => b' ',
-                            _ => 0, // or skip
-                        };
-                        println!("Key pressed → byte: {:?}", byte);
+                        machine.key_pressed(keycode);
+                        machine.in_values[0x16] = 0x01; // set KB flag
                         cpu.signal_interrupt(true);
-
-                        if byte != 0 {
-                            // Emulate serial input
-                            machine.in_values[10] = byte;
-                        }
+                    }
+                    if input.state == ElementState::Released {
+                        println!("Key released → keycode: {:?}", keycode);
+                        machine.key_released(keycode);
                     }
                 }
             }
@@ -148,6 +126,10 @@ struct PCE220Machine {
     pub in_port: Option<u8>,
     pub out_port: Option<u8>,
     pub out_value: u8,
+    // keyboard
+    kb_scan_col: u8,
+    kb_pressed: Option<VirtualKeyCode>,
+    // display
     row: usize,
     col: usize,
     last_col: usize,
@@ -163,11 +145,40 @@ impl PCE220Machine {
             out_port: None,
             out_value: 0,
             in_port: None,
+            kb_scan_col: 0,
+            kb_pressed: None,
             row: 0,
             col: 0,
             last_col: 0,
             higher_cols: false,
         }
+    }
+    pub fn key_pressed(&mut self, keycode: VirtualKeyCode) {
+        self.kb_pressed = Some(keycode);
+    }
+    pub fn key_released(&mut self, keycode: VirtualKeyCode) {
+        self.kb_pressed = None
+    }
+    pub fn get_kb_column(&mut self) -> u8 {
+        let coord: Option<(u8, u8)> = match self.kb_pressed {
+            Some(VirtualKeyCode::Escape) => Some((0, 0x01)), // off
+            Some(VirtualKeyCode::Q) => Some((0x01, 0x02)),
+            Some(VirtualKeyCode::W) => Some((0x01, 0x04)),
+            Some(VirtualKeyCode::E) => Some((0x01, 0x08)),
+            Some(VirtualKeyCode::R) => Some((0x01, 0x10)),
+            Some(VirtualKeyCode::T) => Some((0x01, 0x20)),
+            Some(VirtualKeyCode::Y) => Some((0x01, 0x40)),
+            Some(VirtualKeyCode::U) => Some((0x01, 0x80)),
+            _ => None, // no match
+        };
+        println!("Key pressed → want col: {:?}", self.kb_scan_col);
+        if let Some((x, y)) = coord {
+            if self.kb_scan_col == x {
+                println!("Key pressed → coord: {:?}", coord);
+                return y;
+            }
+        }
+        0
     }
 }
 
@@ -182,15 +193,19 @@ impl Machine for PCE220Machine {
 
     fn port_in(&mut self, address: u16) -> u8 {
         let trunc_address = address & 0xff;
-        let value = self.in_values[address as usize % 256];
+        if (trunc_address == 0x11) | (trunc_address == 0x12) {
+            self.get_kb_column()
+        } else {
+            let value = self.in_values[address as usize % 256];
 
-        println!(
-            "PORT IN → addr: 0x{:02X}, value: 0x{:02X} ({})",
-            trunc_address, value, value as char
-        );
+            println!(
+                "PORT IN → addr: 0x{:02X}, value: 0x{:02X} ({})",
+                trunc_address, value, value as char
+            );
 
-        self.in_port = Some(trunc_address as u8);
-        value
+            self.in_port = Some(trunc_address as u8);
+            value
+        }
     }
 
     fn port_out(&mut self, address: u16, value: u8) {
@@ -208,6 +223,15 @@ impl Machine for PCE220Machine {
         //thread::sleep(timeout);
 
         match trunc_address {
+            // set keyboard scan column
+            0x11 => {
+                self.kb_scan_col = (value & 0xff) as u8;
+            }
+            // clear interrupt reasons
+            0x16 => {
+                let keep_bits = value ^ 0xff;
+                self.in_values[0x16] = self.in_values[0x16] & keep_bits;
+            }
             // switch memory from bank
             0x19 => {
                 // 0xC000 mapping
