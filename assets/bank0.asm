@@ -656,7 +656,7 @@ l8456h:
 l8464h:
 	add a,010h		;8464	c6 10 	. . 
 	jr l843eh		;8466	18 d6 	. . 
-sub_8468h:
+charout:
 	sub 020h		;8468	d6 20 	.   
 	jr nc,l8464h		;846a	30 f8 	0 . 
 l846ch:
@@ -735,7 +735,7 @@ l84cfh:
 	push de			;84d0	d5 	. 
 	push bc			;84d1	c5 	. 
 	ld a,(hl)			;84d2	7e 	~ 
-	call sub_8468h		;84d3	cd 68 84 	. h . 
+	call charout		;84d3	cd 68 84 	. h . 
 	pop bc			;84d6	c1 	. 
 	pop de			;84d7	d1 	. 
 	pop hl			;84d8	e1 	. 
@@ -883,7 +883,7 @@ sub_85b7h:
 l85bch:
 	push de			;85bc	d5 	. 
 	ld a,020h		;85bd	3e 20 	>   
-	call sub_8468h		;85bf	cd 68 84 	. h . 
+	call charout		;85bf	cd 68 84 	. h . 
 	pop de			;85c2	d1 	. 
 	inc e			;85c3	1c 	. 
 	ld a,e			;85c4	7b 	{ 
@@ -1046,7 +1046,7 @@ l86b4h:
 	push de			;86b4	d5 	. 
 	push bc			;86b5	c5 	. 
 	ld a,c			;86b6	79 	y 
-	call sub_8468h		;86b7	cd 68 84 	. h . 
+	call charout		;86b7	cd 68 84 	. h . 
 	pop bc			;86ba	c1 	. 
 	pop de			;86bb	d1 	. 
 	dec b			;86bc	05 	. 
@@ -1140,7 +1140,7 @@ l872dh:
 	ld a,007h		;875f	3e 07 	> . 
 	out (017h),a		;8761	d3 17 	. . 
 	ret			;8763	c9 	. 
-l8764h:
+int_charin:
 	call sub_879fh		;8764	cd 9f 87 	. . . 
 	push bc			;8767	c5 	. 
 	ld b,a			;8768	47 	G 
@@ -1155,20 +1155,20 @@ l8774h:
 	pop bc			;8774	c1 	. 
 	cp 07ch		;8775	fe 7c 	. | 
 	jr z,l8782h		;8777	28 09 	( . 
-	jr c,l8764h		;8779	38 e9 	8 . 
+	jr c,int_charin		;8779	38 e9 	8 . 
 	cp 07eh		;877b	fe 7e 	. ~ 
 	jr z,l8787h		;877d	28 08 	( . 
 	ld a,001h		;877f	3e 01 	> . 
 	ret			;8781	c9 	. 
 l8782h:
 	call sub_878fh		;8782	cd 8f 87 	. . . 
-	jr l8764h		;8785	18 dd 	. . 
+	jr int_charin		;8785	18 dd 	. . 
 l8787h:
 	call sub_8cf5h		;8787	cd f5 8c 	. . . 
-	jr l8764h		;878a	18 d8 	. . 
+	jr int_charin		;878a	18 d8 	. . 
 l878ch:
 	pop bc			;878c	c1 	. 
-	jr l8764h		;878d	18 d5 	. . 
+	jr int_charin		;878d	18 d5 	. . 
 sub_878fh:
 	ld a,000h		;878f	3e 00 	> . 
 	ld (079f1h),a		;8791	32 f1 79 	2 . y 
@@ -3092,7 +3092,7 @@ l9286h:
 	ld a,(079e8h)		;928f	3a e8 79 	: . y 
 l9292h:
 	ld de,(07920h)		;9292	ed 5b 20 79 	. [   y 
-	call sub_8468h		;9296	cd 68 84 	. h . 
+	call charout		;9296	cd 68 84 	. h . 
 	ret			;9299	c9 	. 
 l929ah:
 	set 4,(hl)		;929a	cb e6 	. . 
@@ -5894,7 +5894,7 @@ la81dh:
 	ld (0792bh),hl		;a844	22 2b 79 	" + y 
 	ex de,hl			;a847	eb 	. 
 	pop af			;a848	f1 	. 
-	call sub_8468h		;a849	cd 68 84 	. h . 
+	call charout		;a849	cd 68 84 	. h . 
 	ld a,0ffh		;a84c	3e ff 	> . 
 	ld (07926h),a		;a84e	32 26 79 	2 & y 
 	ld hl,0796eh		;a851	21 6e 79 	! n y 
@@ -6164,7 +6164,7 @@ laa1fh:
 	jr nz,laa62h		;aa45	20 1b 	  . 
 	ld de,(0792bh)		;aa47	ed 5b 2b 79 	. [ + y 
 	ld a,03fh		;aa4b	3e 3f 	> ? 
-	call sub_8468h		;aa4d	cd 68 84 	. h . 
+	call charout		;aa4d	cd 68 84 	. h . 
 	xor a			;aa50	af 	. 
 	ld (07928h),a		;aa51	32 28 79 	2 ( y 
 	ld a,(079dah)		;aa54	3a da 79 	: . y 
@@ -6186,7 +6186,7 @@ laa75h:
 	ld (0792ch),a		;aa75	32 2c 79 	2 , y 
 	push de			;aa78	d5 	. 
 	ld a,05fh		;aa79	3e 5f 	> _ 
-	call sub_8468h		;aa7b	cd 68 84 	. h . 
+	call charout		;aa7b	cd 68 84 	. h . 
 	ld b,000h		;aa7e	06 00 	. . 
 	ld a,(07927h)		;aa80	3a 27 79 	: ' y 
 	inc a			;aa83	3c 	< 
@@ -6282,7 +6282,7 @@ sub_aad6h:
 	set 2,(hl)		;ab2b	cb d6 	. . 
 	ld a,0f7h		;ab2d	3e f7 	> . 
 lab2fh:
-	call sub_8468h		;ab2f	cd 68 84 	. h . 
+	call charout		;ab2f	cd 68 84 	. h . 
 	ret			;ab32	c9 	. 
 lab33h:
 	res 2,(hl)		;ab33	cb 96 	. . 
@@ -6316,7 +6316,7 @@ lab56h:
 	ret nz			;ab62	c0 	. 
 	ld d,000h		;ab63	16 00 	. . 
 	ld a,020h		;ab65	3e 20 	>   
-	call sub_8468h		;ab67	cd 68 84 	. h . 
+	call charout		;ab67	cd 68 84 	. h . 
 	ret			;ab6a	c9 	. 
 sub_ab6bh:
 	ld (07f38h),ix		;ab6b	dd 22 38 7f 	. " 8  
@@ -6551,7 +6551,7 @@ lad29h:
 	ld (079e8h),a		;ad56	32 e8 79 	2 . y 
 	ld a,0f7h		;ad59	3e f7 	> . 
 lad5bh:
-	call sub_8468h		;ad5b	cd 68 84 	. h . 
+	call charout		;ad5b	cd 68 84 	. h . 
 	ret			;ad5e	c9 	. 
 lad5fh:
 	dec a			;ad5f	3d 	= 
@@ -6688,7 +6688,7 @@ sub_ae13h:
 	ld a,(079e8h)		;ae25	3a e8 79 	: . y 
 lae28h:
 	ld de,(07920h)		;ae28	ed 5b 20 79 	. [   y 
-	call sub_8468h		;ae2c	cd 68 84 	. h . 
+	call charout		;ae2c	cd 68 84 	. h . 
 	ret			;ae2f	c9 	. 
 lae30h:
 	ld a,020h		;ae30	3e 20 	>   
@@ -7266,11 +7266,11 @@ lb137h:
 	ld e,013h		;b144	1e 13 	. . 
 	ld a,05bh		;b146	3e 5b 	> [ 
 	push de			;b148	d5 	. 
-	call sub_8468h		;b149	cd 68 84 	. h . 
+	call charout		;b149	cd 68 84 	. h . 
 	pop de			;b14c	d1 	. 
 	ld e,017h		;b14d	1e 17 	. . 
 	ld a,05dh		;b14f	3e 5d 	> ] 
-	call sub_8468h		;b151	cd 68 84 	. h . 
+	call charout		;b151	cd 68 84 	. h . 
 	jp lb0aah		;b154	c3 aa b0 	. . . 
 lb157h:
 	ld c,a			;b157	4f 	O 
@@ -7329,7 +7329,7 @@ lb19ch:
 	ld (0790ch),a		;b1a7	32 0c 79 	2 . y 
 	ret			;b1aa	c9 	. 
 sub_b1abh:
-	call l8764h		;b1ab	cd 64 87 	. d . 
+	call int_charin		;b1ab	cd 64 87 	. d . 
 	call sub_8c1fh		;b1ae	cd 1f 8c 	. . . 
 	cp 010h		;b1b1	fe 10 	. . 
 	ret z			;b1b3	c8 	. 
@@ -7364,7 +7364,7 @@ sub_b1cah:
 	ld (hl),a			;b1e5	77 	w 
 	ld de,(07920h)		;b1e6	ed 5b 20 79 	. [   y 
 	ld (079e8h),a		;b1ea	32 e8 79 	2 . y 
-	call sub_8468h		;b1ed	cd 68 84 	. h . 
+	call charout		;b1ed	cd 68 84 	. h . 
 	ld a,(07924h)		;b1f0	3a 24 79 	: $ y 
 	ld hl,07925h		;b1f3	21 25 79 	! % y 
 	cp (hl)			;b1f6	be 	. 
@@ -8128,7 +8128,7 @@ sub_b6e2h:
 	ld (07922h),de		;b701	ed 53 22 79 	. S " y 
 	ld a,05fh		;b705	3e 5f 	> _ 
 lb707h:
-	call sub_8468h		;b707	cd 68 84 	. h . 
+	call charout		;b707	cd 68 84 	. h . 
 	ld a,(07924h)		;b70a	3a 24 79 	: $ y 
 	ld l,a			;b70d	6f 	o 
 	ld h,07ch		;b70e	26 7c 	& | 
@@ -8249,7 +8249,7 @@ sub_b7a2h:
 	ld a,(079e8h)		;b7b2	3a e8 79 	: . y 
 lb7b5h:
 	ld de,(07920h)		;b7b5	ed 5b 20 79 	. [   y 
-	call sub_8468h		;b7b9	cd 68 84 	. h . 
+	call charout		;b7b9	cd 68 84 	. h . 
 	ret			;b7bc	c9 	. 
 lb7bdh:
 	ld a,020h		;b7bd	3e 20 	>   
@@ -8341,7 +8341,7 @@ lb85fh:
 	call sub_a7ddh		;b862	cd dd a7 	. . . 
 	ld de,(07920h)		;b865	ed 5b 20 79 	. [   y 
 	ld a,03ch		;b869	3e 3c 	> < 
-	jp sub_8468h		;b86b	c3 68 84 	. h . 
+	jp charout		;b86b	c3 68 84 	. h . 
 lb86eh:
 	call sub_b9a7h		;b86e	cd a7 b9 	. . . 
 	call sub_9351h		;b871	cd 51 93 	. Q . 
@@ -9398,7 +9398,7 @@ sub_be32h:
 	jp sub_b02eh		;be59	c3 2e b0 	. . . 
 	jp sub_9935h		;be5c	c3 35 99 	. 5 . 
 	jp l843ah		;be5f	c3 3a 84 	. : . 
-	jp sub_8468h		;be62	c3 68 84 	. h . 
+	jp charout		;be62	c3 68 84 	. h . 
 	jp sub_85b7h		;be65	c3 b7 85 	. . . 
 	jp sub_a85bh		;be68	c3 5b a8 	. [ . 
 	jp sub_b3c2h		;be6b	c3 c2 b3 	. . . 
@@ -9604,7 +9604,8 @@ sub_bee9h:
 	jp l871ah		;bfc4	c3 1a 87 	. . . 
 	jp l872dh		;bfc7	c3 2d 87 	. - . 
 	jp sub_92f5h		;bfca	c3 f5 92 	. . . 
-	jp l8764h		;bfcd	c3 64 87 	. d . 
+sys_charin:
+	jp int_charin		;bfcd	c3 64 87 	. d . 
 	jp sub_8687h		;bfd0	c3 87 86 	. . . 
 	jp l86ech		;bfd3	c3 ec 86 	. . . 
 	jp l86cdh		;bfd6	c3 cd 86 	. . . 
@@ -9616,9 +9617,9 @@ sub_bee9h:
 	jp sub_854dh		;bfe8	c3 4d 85 	. M . 
 	jp sub_84f7h		;bfeb	c3 f7 84 	. . . 
 	jp sub_86b3h		;bfee	c3 b3 86 	. . . 
-stringout:
+sys_stringout:
 	jp sub_84cdh		;bff1	c3 cd 84 	. . . 
-runmode:
+sys_runmode:
 	jp l923fh		;bff4	c3 3f 92 	. ? . 
 	jp sub_ac03h		;bff7	c3 03 ac 	. . . 
 	jp sub_88abh		;bffa	c3 ab 88 	. . . 

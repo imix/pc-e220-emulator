@@ -1,3 +1,5 @@
-stringout: equ 0xbff1
+sys_stringout: equ 0xbff1
 charout: equ 0x8468
-runmode: equ 0xbff4
+sys_charin: equ 0xbfcd
+sys_runmode: equ 0xbff4
+int_charin: equ 0x8764

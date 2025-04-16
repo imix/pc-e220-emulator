@@ -2,8 +2,9 @@
 ; command line: z80dasm -l -a -S symbols.sym -b bank1.blk -g 0xC000 -t bank1.bin
 
 	org	0c000h
-stringout:	equ 0xbff1
-runmode:	equ 0xbff4
+sys_charin:	equ 0xbfcd
+sys_stringout:	equ 0xbff1
+sys_runmode:	equ 0xbff4
 
 lc000h:
 	ld a,001h		;c000	3e 01 	> . 
@@ -64,7 +65,7 @@ lc05dh:
 sub_c065h:
 	ld a,0c3h		;c065	3e c3 	> . 
 	ld (00000h),a		;c067	32 00 00 	2 . . 
-	ld hl,runmode		;c06a	21 f4 bf 	! . . 
+	ld hl,sys_runmode		;c06a	21 f4 bf 	! . . 
 	ld (00001h),hl		;c06d	22 01 00 	" . . 
 	ld hl,00003h		;c070	21 03 00 	! . . 
 	ld b,03dh		;c073	06 3d 	. = 
@@ -144,9 +145,9 @@ lc0fdh:
 	ld de,00100h		;c107	11 00 01 	. . . 
 	ld b,018h		;c10a	06 18 	. . 
 	ld hl,memclear_start		;c10c	21 61 c2 	! a . 
-	call stringout		;c10f	cd f1 bf 	. . . 
+	call sys_stringout		;c10f	cd f1 bf 	. . . 
 lc112h:
-	call 0bfcdh		;c112	cd cd bf 	. . . 
+	call sys_charin		;c112	cd cd bf 	. . . 
 	cp 016h		;c115	fe 16 	. . 
 	jr z,lc0d2h		;c117	28 b9 	( . 
 	cp 001h		;c119	fe 01 	. . 
@@ -311,7 +312,7 @@ lc21dh:
 	ld hl,07964h		;c242	21 64 79 	! d y 
 	set 7,(hl)		;c245	cb fe 	. . 
 lc247h:
-	call 0bfcdh		;c247	cd cd bf 	. . . 
+	call sys_charin		;c247	cd cd bf 	. . . 
 	ld hl,07964h		;c24a	21 64 79 	! d y 
 	res 7,(hl)		;c24d	cb be 	. . 
 	cp 001h		;c24f	fe 01 	. . 
@@ -1714,7 +1715,7 @@ lcc35h:
 	sub l			;cc3b	95 	. 
 	jr z,lcc42h		;cc3c	28 04 	( . 
 	ld b,a			;cc3e	47 	G 
-	call stringout		;cc3f	cd f1 bf 	. . . 
+	call sys_stringout		;cc3f	cd f1 bf 	. . . 
 lcc42h:
 	ld (07922h),de		;cc42	ed 53 22 79 	. S " y 
 	ld hl,0797dh		;cc46	21 7d 79 	! } y 
@@ -2130,7 +2131,7 @@ lcf5eh:
 	ld (07925h),a		;cf63	32 25 79 	2 % y 
 	ld de,(07920h)		;cf66	ed 5b 20 79 	. [   y 
 	ld hl,07c00h		;cf6a	21 00 7c 	! . | 
-	call stringout		;cf6d	cd f1 bf 	. . . 
+	call sys_stringout		;cf6d	cd f1 bf 	. . . 
 	ld a,c			;cf70	79 	y 
 	cp 000h		;cf71	fe 00 	. . 
 	jr z,lcf85h		;cf73	28 10 	( . 

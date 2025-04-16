@@ -1,24 +1,24 @@
 // PC-E220 Emulator adapted to use pixels + winit rendering
+//
+
+// PC-E220 Emulator refactored with separate CPU and UI threads using Arc + Mutex
 
 use std::io::*;
-use std::sync::mpsc;
-use std::sync::mpsc::Receiver;
-use std::sync::mpsc::TryRecvError;
+use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time;
+use std::time::Duration;
 
 use iz80::{Cpu, Machine};
 use pixels::{Pixels, SurfaceTexture};
 use winit::dpi::LogicalSize;
-use winit::event::{ElementState, KeyboardInput, VirtualKeyCode};
-use winit::event::{Event, WindowEvent};
+use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::WindowBuilder;
 
 const WIDTH: usize = 144;
 const HEIGHT: usize = 32;
 
-static RAMLOW: &[u8] = include_bytes!("../assets/sharp-ram0.bin");
+// ROM Includes
 static RAM7800: &[u8] = include_bytes!("../assets/ram_7800.bin");
 static BANK0_SYSTEM: &[u8] = include_bytes!("../assets/bank0.bin");
 static BANK1_BASIC: &[u8] = include_bytes!("../assets/bank1.bin");
@@ -30,19 +30,44 @@ static BANK6_ENG1: &[u8] = include_bytes!("../assets/bank6.bin");
 static BANK7_ENG2: &[u8] = include_bytes!("../assets/bank7.bin");
 
 fn main() {
-    // Load initial roms
-    let mut machine = PCE220Machine::new();
-    load_memory(&mut machine, 0x0000, RAMLOW);
-    load_memory(&mut machine, 0x7800, RAM7800);
-    load_memory(&mut machine, 0x8000, BANK0_SYSTEM);
-    load_memory(&mut machine, 0xC000, BANK1_BASIC);
+    let machine = Arc::new(Mutex::new(PCE220Machine::new()));
+    let cpu = Arc::new(Mutex::new(Cpu::new()));
 
-    let mut cpu = Cpu::new();
-    cpu.set_trace(true);
-    // BFF4 RUN Mode
-    //cpu.state.set_pc(0xbff4);
-    //cpu.state.set_pc(0x0000);
+    // Load memory once at the start
+    {
+        let mut machine = machine.lock().unwrap();
+        // on startup load rom to 0x0000, will be removed later
+        load_memory(&mut machine, 0x0000, BANK0_SYSTEM);
+        // load_memory(&mut machine, 0x7800, RAM7800);
+        // probably not necessary, setup code in bank0-0.asm does this
+        load_memory(&mut machine, 0x8000, BANK0_SYSTEM);
+        load_memory(&mut machine, 0xC000, BANK1_BASIC);
+        machine.in_values[3] = 1;
+        machine.in_values[0x19] = 1;
+    }
 
+    // Enable CPU trace mode once at the start
+    {
+        let mut cpu = cpu.lock().unwrap();
+        cpu.set_trace(true);
+    }
+
+    // Spawn CPU emulation thread
+    let cpu_clone = Arc::clone(&cpu);
+    let machine_clone = Arc::clone(&machine);
+    thread::spawn(move || loop {
+        {
+            let mut cpu = cpu_clone.lock().unwrap();
+            let mut machine = machine_clone.lock().unwrap();
+            for _ in 0..1000 {
+                cpu.execute_instruction(&mut *machine);
+                cpu.signal_interrupt(false);
+            }
+        }
+        thread::sleep(Duration::from_micros(100));
+    });
+
+    // UI thread
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new()
         .with_title("PC-E220 Emulator")
@@ -54,21 +79,15 @@ fn main() {
     let surface_texture = SurfaceTexture::new(WIDTH as u32, HEIGHT as u32, &window);
     let mut pixels = Pixels::new(WIDTH as u32, HEIGHT as u32, surface_texture).unwrap();
 
-    machine.in_values[3] = 1; // TX Ready
-    machine.in_values[0x19] = 1; // bank 1 preloaded
+    let machine_ui = Arc::clone(&machine);
+    let cpu_ui = Arc::clone(&cpu);
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
 
         match event {
             Event::RedrawRequested(_) => {
-                for _ in 0..1000 {
-                    cpu.execute_instruction(&mut machine);
-
-                    // reset any pending interrupts after execution
-                    cpu.signal_interrupt(false);
-                }
-
+                let machine = machine_ui.lock().unwrap();
                 let frame = pixels.frame_mut();
                 for y in 0..HEIGHT {
                     for x in 0..WIDTH {
@@ -79,23 +98,26 @@ fn main() {
                         frame[idx..idx + 4].copy_from_slice(&rgba);
                     }
                 }
-
                 pixels.render().unwrap();
             }
             Event::WindowEvent {
                 event: WindowEvent::KeyboardInput { input, .. },
                 ..
             } => {
+                let mut machine = machine_ui.lock().unwrap();
+                let mut cpu = cpu_ui.lock().unwrap();
                 if let Some(keycode) = input.virtual_keycode {
-                    if input.state == ElementState::Pressed {
-                        println!("Key pressed → keycode: {:?}", keycode);
-                        machine.key_pressed(keycode);
-                        machine.in_values[0x16] = 0x01; // set KB flag
-                        cpu.signal_interrupt(true);
-                    }
-                    if input.state == ElementState::Released {
-                        println!("Key released → keycode: {:?}", keycode);
-                        machine.key_released(keycode);
+                    match input.state {
+                        ElementState::Pressed => {
+                            println!("Key pressed → keycode: {:?}", keycode);
+                            machine.key_pressed(keycode);
+                            machine.in_values[0x16] = 0x01;
+                            cpu.signal_interrupt(true);
+                        }
+                        ElementState::Released => {
+                            println!("Key released → keycode: {:?}", keycode);
+                            machine.key_released(keycode);
+                        }
                     }
                 }
             }
@@ -255,6 +277,14 @@ impl Machine for PCE220Machine {
                 if exp == 0x01 {
                     print!("Expansion selected!");
                 }
+            }
+            // Guess: unmap ROM from 0x0000
+            // did not find anything in the documentation about this port
+            // it is called exacly once in the source, when 0xfffa is called from
+            // the boot code in bank0-0.asm
+            0x1A => {
+                let data: [u8; 0x4000] = [0; 0x4000]; // 16 KB of zeroes
+                load_memory(self, 0x0000, &data);
             }
             // LCD-data out
             0x5A => {

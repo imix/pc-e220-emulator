@@ -8,8 +8,8 @@ This file contains my findings on the PC-E220. There is not much information aro
 
 ## my reverse engineering
 
-### Interrupt Mode
-I assume, that the LZ8413AM uses Mode 1 interrupts as default. Reason: In all Roms there is only one place where "IM X" is called (to IM 1). Memory adress 0x0038 which is used for Mode 1 is setup (to RET -> wake from HALT). Therefore I created a custom ram map which switches to mode 1 before entering RUN mode on start.
+### Boot mode
+Bank0 is initially mapped to 0x0000 (see bank0-0.asm). It sets interrupt mode, loads bank1 into the higher memory and then jumps into bank1 (0xfffa).
 
 ### Character in
 Starting from the [analysis on the pc-e220 homepage](https://wwwhomes.uni-bielefeld.de/achim/pc-e220/char_in.txt) I commented the character in code a little more, see [charin.asm](charin.asm)
