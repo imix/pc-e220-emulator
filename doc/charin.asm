@@ -90,7 +90,7 @@
       SCF
       RET
 8917: CALL 895C		; busy wait
-      IN A,(10)		; read keyboard column A
+      IN A,(0x10)	; read keyboard column A
       JR -78 [88D0]
 
 895C: PUSH BC           ; here starts time wait code

@@ -215,7 +215,7 @@ impl Machine for PCE220Machine {
 
     fn port_in(&mut self, address: u16) -> u8 {
         let trunc_address = address & 0xff;
-        if (trunc_address == 0x11) | (trunc_address == 0x12) {
+        if (trunc_address == 0x10) {
             self.get_kb_column()
         } else {
             let value = self.in_values[address as usize % 256];
