@@ -183,7 +183,7 @@ impl PCE220Machine {
     }
     pub fn get_kb_column(&mut self) -> u8 {
         let coord: Option<(u8, u8)> = match self.kb_pressed {
-            Some(VirtualKeyCode::Escape) => Some((0, 0x01)), // off
+            Some(VirtualKeyCode::Escape) => Some((0x01, 0x01)), // off
             Some(VirtualKeyCode::Q) => Some((0x01, 0x02)),
             Some(VirtualKeyCode::W) => Some((0x01, 0x04)),
             Some(VirtualKeyCode::E) => Some((0x01, 0x08)),
@@ -191,6 +191,67 @@ impl PCE220Machine {
             Some(VirtualKeyCode::T) => Some((0x01, 0x20)),
             Some(VirtualKeyCode::Y) => Some((0x01, 0x40)),
             Some(VirtualKeyCode::U) => Some((0x01, 0x80)),
+
+            Some(VirtualKeyCode::A) => Some((0x02, 0x01)),
+            Some(VirtualKeyCode::S) => Some((0x02, 0x02)),
+            Some(VirtualKeyCode::D) => Some((0x02, 0x04)),
+            Some(VirtualKeyCode::F) => Some((0x02, 0x08)),
+            Some(VirtualKeyCode::G) => Some((0x02, 0x10)),
+            Some(VirtualKeyCode::H) => Some((0x02, 0x20)),
+            Some(VirtualKeyCode::J) => Some((0x02, 0x40)),
+            Some(VirtualKeyCode::U) => Some((0x02, 0x80)),
+
+            Some(VirtualKeyCode::Z) => Some((0x04, 0x01)),
+            Some(VirtualKeyCode::X) => Some((0x04, 0x02)),
+            Some(VirtualKeyCode::C) => Some((0x04, 0x04)),
+            Some(VirtualKeyCode::V) => Some((0x04, 0x08)),
+            Some(VirtualKeyCode::B) => Some((0x04, 0x10)),
+            Some(VirtualKeyCode::N) => Some((0x04, 0x20)),
+            Some(VirtualKeyCode::M) => Some((0x04, 0x40)),
+            Some(VirtualKeyCode::Comma) => Some((0x04, 0x80)),
+
+            // Some(VirtualKeyCode::BASIC) => Some((0x08, 0x01)),
+            // Some(VirtualKeyCode::TEXT) => Some((0x08, 0x02)),
+            // Some(VirtualKeyCode::CAPS) => Some((0x08, 0x04)),
+            // Some(VirtualKeyCode::?) => Some((0x08, 0x08)),
+            Some(VirtualKeyCode::Tab) => Some((0x08, 0x10)),
+            Some(VirtualKeyCode::Space) => Some((0x08, 0x20)),
+            Some(VirtualKeyCode::Up) => Some((0x08, 0x40)),
+            Some(VirtualKeyCode::Down) => Some((0x08, 0x80)),
+
+            Some(VirtualKeyCode::Left) => Some((0x10, 0x01)),
+            Some(VirtualKeyCode::Right) => Some((0x10, 0x02)),
+            //Some(VirtualKeyCode::C) => Some((0x10, 0x04)),
+            Some(VirtualKeyCode::Numpad0) => Some((0x10, 0x08)),
+            Some(VirtualKeyCode::Period) => Some((0x10, 0x10)),
+            //Some(VirtualKeyCode::N) => Some((0x10, 0x20)),
+            Some(VirtualKeyCode::NumpadAdd) => Some((0x10, 0x40)),
+            Some(VirtualKeyCode::NumpadEnter) => Some((0x10, 0x80)),
+
+            Some(VirtualKeyCode::L) => Some((0x20, 0x01)),
+            //Some(VirtualKeyCode::O) => Some((0x20, 0x02)),
+            //Some(VirtualKeyCode::Insert) => Some((0x20, 0x04)),
+            Some(VirtualKeyCode::Numpad1) => Some((0x20, 0x08)),
+            Some(VirtualKeyCode::Numpad2) => Some((0x20, 0x10)),
+            Some(VirtualKeyCode::Numpad3) => Some((0x20, 0x20)),
+            Some(VirtualKeyCode::NumpadSubtract) => Some((0x20, 0x40)),
+            //Some(VirtualKeyCode::NumpadEnter) => Some((0x20, 0x80)),
+            Some(VirtualKeyCode::I) => Some((0x40, 0x01)),
+            Some(VirtualKeyCode::O) => Some((0x40, 0x02)),
+            Some(VirtualKeyCode::Insert) => Some((0x40, 0x04)),
+            Some(VirtualKeyCode::Numpad4) => Some((0x40, 0x08)),
+            Some(VirtualKeyCode::Numpad5) => Some((0x40, 0x10)),
+            Some(VirtualKeyCode::Numpad6) => Some((0x40, 0x20)),
+            Some(VirtualKeyCode::NumpadMultiply) => Some((0x40, 0x40)),
+            //Some(VirtualKeyCode::NumpadEnter) => Some((0x40, 0x80)),
+            Some(VirtualKeyCode::P) => Some((0x80, 0x01)),
+            Some(VirtualKeyCode::Back) => Some((0x80, 0x02)),
+            //Some(VirtualKeyCode::Insert) => Some((0x80, 0x04)),
+            Some(VirtualKeyCode::Numpad7) => Some((0x80, 0x08)),
+            Some(VirtualKeyCode::Numpad8) => Some((0x80, 0x10)),
+            Some(VirtualKeyCode::Numpad9) => Some((0x80, 0x20)),
+            Some(VirtualKeyCode::NumpadDivide) => Some((0x80, 0x40)),
+            //Some(VirtualKeyCode::NumpadEnter) => Some((0x80, 0x80)),
             _ => None, // no match
         };
         println!("Key pressed → want col: {:?}", self.kb_scan_col);
@@ -289,7 +350,10 @@ impl Machine for PCE220Machine {
             // LCD-data out
             0x5A => {
                 // each byte represents 8 successive pixels in a column
-                println!("LCD-data → row: {}, col: {}", self.row, self.col);
+                println!(
+                    "LCD-data → row: {}, col: {}, last_col: {}",
+                    self.row, self.col, self.last_col
+                );
                 for row_idx in 0..7 {
                     let pos_x = self.col * 5 + self.last_col;
                     let pos_y = self.row * 8 + row_idx;
@@ -301,7 +365,7 @@ impl Machine for PCE220Machine {
                     self.framebuffer[pos_y * WIDTH + pos_x] = pixel * 255;
                 }
                 if self.higher_cols {
-                    self.last_col -= 1;
+                    self.last_col = self.last_col.saturating_sub(1);
                 } else {
                     self.last_col += 1;
                 }
